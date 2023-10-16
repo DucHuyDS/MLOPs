@@ -113,19 +113,21 @@ class PredictorApi:
             workers=number_of_workers,
         )
 
+
+
+default_config_path = (
+    AppPath.MODEL_CONFIG_DIR
+    / ProblemConst.PHASE1
+    / ProblemConst.PROB1
+    / "model-1.yaml"
+).as_posix()
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--config-path", type=str, default=default_config_path)
+parser.add_argument("--port", type=int, default=PREDICTOR_API_PORT)
+args = parser.parse_args()
+
+predictor = ModelPredictor(config_file_path=args.config_path)
+api = PredictorApi(predictor)
 if __name__ == "__main__":
-    default_config_path = (
-        AppPath.MODEL_CONFIG_DIR
-        / ProblemConst.PHASE1
-        / ProblemConst.PROB1
-        / "model-1.yaml"
-    ).as_posix()
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--config-path", type=str, default=default_config_path)
-    parser.add_argument("--port", type=int, default=PREDICTOR_API_PORT)
-    args = parser.parse_args()
-
-    predictor = ModelPredictor(config_file_path=args.config_path)
-    api = PredictorApi(predictor)
     api.run(port=args.port)
