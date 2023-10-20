@@ -15,6 +15,7 @@ from multiprocessing import cpu_count
 from problem_config import ProblemConst, create_prob_config
 from raw_data_processor import RawDataProcessor
 from utils import AppConfig, AppPath
+from fastapi.responses import ORJSONResponse
 
 PREDICTOR_API_PORT = 8000
 
@@ -72,11 +73,11 @@ class ModelPredictor:
 
         run_time = round((time.time() - start_time) * 1000, 0)
         logging.info(f"prediction takes {run_time} ms")
-        return {
+        return ORJSONResponse({
             "id": data.id,
             "predictions": prediction.tolist(),
             "drift": is_drifted,
-        }
+        })
 
     @staticmethod
     def save_request_data(feature_df: pd.DataFrame, captured_data_dir, data_id: str):
