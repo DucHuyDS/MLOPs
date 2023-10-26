@@ -3,7 +3,7 @@ import logging
 import os
 import random
 import time
-
+from redis import Redis
 import mlflow
 import pandas as pd
 import uvicorn
@@ -53,7 +53,7 @@ class ModelPredictor:
             return 1
         return 0
 
-    def predict(self, data: Data):
+    def predict(self, data: Data, app):
         start_time = time.time()
 
         # preprocess
@@ -73,11 +73,14 @@ class ModelPredictor:
 
         run_time = round((time.time() - start_time) * 1000, 0)
         logging.info(f"prediction takes {run_time} ms")
-        return ORJSONResponse({
+
+        data_response = {
             "id": data.id,
             "predictions": prediction.tolist(),
             "drift": is_drifted,
-        })
+        }
+        app.state.redis.set(data.rows[:20], data_response)
+        return data_response
 
     @staticmethod
     def save_request_data(feature_df: pd.DataFrame, captured_data_dir, data_id: str):
@@ -95,14 +98,24 @@ class PredictorApi:
         self.predictor = predictor
         self.app = FastAPI()
 
+        @self.app.on_event("startup")
+        async def startup_event():
+            self.app.state.redis = Redis(host='localhost', port = 6379)
+
+        @app.on_event("shutdown")
+        async def shutdown_event():
+            self.app.state.redis.close()
+        
         @self.app.get("/")
         async def root():
             return {"message": "hello"}
 
         @self.app.post("/phase-1/prob-1/predict")
         async def predict(data: Data, request: Request):
-            response = self.predictor.predict(data)
-            return response
+            response = self.app.state.redis.get(data.rows[:20])
+            if response is None:
+                response = self.predictor.predict(data, self.app)
+            return ORJSONResponse(response)
 
 
     def run(self, port):
@@ -112,6 +125,8 @@ class PredictorApi:
             host="0.0.0.0",
             port=port,
             workers=number_of_workers,
+            access_log=False,
+            loop="uvloop",
         )
 
 
